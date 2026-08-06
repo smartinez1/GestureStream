@@ -22,6 +22,7 @@ class GestureStreamDemo(GestureStreamController):
         frame_count = 0
         demo_time = 0
         h, w = 720, 1280
+        last_phase = 0
 
         while True:
             frame = np.zeros((h, w, 3), dtype=np.uint8)
@@ -30,8 +31,23 @@ class GestureStreamDemo(GestureStreamController):
             for i in range(w):
                 frame[:, i] = [int(i / w * 50), int(i / w * 100), 100]
 
-            # Simulate pointing gesture with moving hand
-            if demo_time < 5:
+            phase = int(demo_time // 5)
+
+            # Trigger the diffusion once per phase transition:
+            # phase 1 = closed -> open (explode shown image),
+            # phase 2 = open -> closed (reconstruct next image)
+            if phase == 1 and phase != last_phase:
+                self.diffusion.trigger(
+                    self._composite_image(self.images[self.image_index])
+                )
+            elif phase == 2 and phase != last_phase:
+                self.image_index = (self.image_index + 1) % len(self.images)
+                self.diffusion.reconstruct(
+                    self._composite_image(self.images[self.image_index])
+                )
+            last_phase = phase
+
+            if phase == 0:
                 # Pointing gesture - cube rotates
                 x = int(w / 2 + 200 * np.cos(demo_time))
                 y = int(h / 2 + 150 * np.sin(demo_time * 0.5))
@@ -51,39 +67,59 @@ class GestureStreamDemo(GestureStreamController):
                            (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
                            (200, 200, 0), 1)
 
-            elif demo_time < 10:
-                # Open hand gesture - image overlay
+            elif phase == 1:
+                # Open hand gesture - image projected on the cube
                 x = int(w / 3)
                 y = int(h / 2)
 
-                frame = self.overlay_image_on_hand(
-                    frame, self.image_1, (x, y), scale=0.4
+                rotation = np.array([
+                    np.sin(demo_time) * 0.3,
+                    np.cos(demo_time) * 0.4,
+                    demo_time * 0.6
+                ])
+
+                if self.diffusion.is_active():
+                    frame = self.diffusion.draw(frame, (x, y), rotation, size=40)
+                else:
+                    frame = self.draw_image_on_cube(
+                        frame, (x, y), size=40, rotation=rotation
+                    )
+
+                cv2.putText(frame, "OPEN HAND - EXPLOSION", (10, 100),
+                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 200), 2)
+                cv2.putText(
+                    frame,
+                    f"Image {self.image_index + 1}/{len(self.images)} + Diffusion",
+                    (10, 150),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (100, 200, 100), 1,
                 )
 
-                cv2.putText(frame, "OPEN HAND GESTURE", (10, 100),
-                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 200), 2)
-                cv2.putText(frame, f"Image Position: ({x}, {y})",
-                           (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                           (200, 200, 0), 1)
-                cv2.putText(frame, "Image 1: Gradient", (10, 200),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (100, 200, 100), 1)
-
-            elif demo_time < 15:
+            elif phase == 2:
                 # Open hand gesture with image 2
                 x = int(2 * w / 3)
                 y = int(h / 2)
 
-                frame = self.overlay_image_on_hand(
-                    frame, self.image_2, (x, y), scale=0.4
-                )
+                rotation = np.array([
+                    np.sin(demo_time) * 0.3,
+                    np.cos(demo_time) * 0.4,
+                    demo_time * 0.6
+                ])
 
-                cv2.putText(frame, "IMAGE SWITCH", (10, 100),
+                if self.diffusion.is_active():
+                    frame = self.diffusion.draw(frame, (x, y), rotation, size=40)
+                else:
+                    frame = self.draw_image_on_cube(
+                        frame, (x, y), size=40, rotation=rotation
+                    )
+
+                cv2.putText(frame, "CLOSE HAND - RECONSTRUCTION", (10, 100),
                            cv2.FONT_HERSHEY_SIMPLEX, 1, (200, 100, 255), 2)
-                cv2.putText(frame, f"Image Position: ({x}, {y})",
-                           (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                           (200, 200, 0), 1)
-                cv2.putText(frame, "Image 2: Checkerboard", (10, 200),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (100, 200, 100), 1)
+                cv2.putText(
+                    frame,
+                    f"Image {self.image_index + 1}/{len(self.images)}",
+                    (10, 150),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (100, 200, 100), 1,
+                )
 
             # Reset animation
             if demo_time >= 15:

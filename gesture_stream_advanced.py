@@ -14,14 +14,15 @@ import time as time_module
 class AdvancedGestureStream(GestureStreamController):
     """Extended version with recording and visual effects."""
 
-    def __init__(self, image_path_1=None, image_path_2=None, enable_recording=False):
-        super().__init__(image_path_1, image_path_2)
+    def __init__(self, image_path_1=None, image_path_2=None, image_folder="images", enable_recording=False):
+        super().__init__(image_path_1, image_path_2, image_folder)
 
         self.enable_recording = enable_recording
         self.recording = False
         self.gesture_history = []
         self.frame_count = 0
         self.toggle_debounce = 0
+        self.show_gesture_info = True
 
         if enable_recording:
             self.setup_recording()
@@ -50,6 +51,8 @@ class AdvancedGestureStream(GestureStreamController):
 
     def draw_gesture_info(self, frame):
         """Draw gesture detection info on frame."""
+        if not self.show_gesture_info:
+            return frame
         h, w = frame.shape[:2]
 
         # Gesture status panel
@@ -133,9 +136,11 @@ class AdvancedGestureStream(GestureStreamController):
 
         print("Advanced Gesture Stream Active!")
         print("- Point with one hand to control the cube")
-        print("- Open your other hand to switch images")
+        print("- Open your other hand to project the next image on the cube")
         print("- 'r' to toggle recording")
         print("- 'm' to toggle metrics display")
+        print("- 'h' to toggle annotations (cube, arrow, hand keypoints)")
+        print("- 'i' to toggle the gesture status box")
         print("- 'q' to quit")
 
         frame_count = 0
@@ -159,21 +164,25 @@ class AdvancedGestureStream(GestureStreamController):
 
             # Draw enhanced cube
             if self.gesture_hand_position is not None:
-                frame = self.draw_enhanced_cube(
-                    frame,
-                    (int(self.gesture_hand_position[0]), int(self.gesture_hand_position[1])),
-                    self.cube_rotation,
-                    size=40,
+                cube_pos = (
+                    int(self.gesture_hand_position[0]),
+                    int(self.gesture_hand_position[1]),
                 )
+                if self.diffusion.is_active():
+                    frame = self.diffusion.draw_voxels(
+                        frame, cube_pos, self.cube_rotation, size=40
+                    )
+                else:
+                    frame = self.draw_image_on_cube(
+                        frame, cube_pos, size=40, rotation=self.projection_rotation
+                    )
+                if self.show_annotations:
+                    frame = self.draw_enhanced_cube(
+                        frame, cube_pos, self.cube_rotation, size=40
+                    )
                 self.gesture_history.append(self.gesture_hand_position)
                 if len(self.gesture_history) > 100:
                     self.gesture_history.pop(0)
-
-            # Overlay image
-            if self.control_hand_position is not None:
-                frame = self.overlay_image_on_hand(
-                    frame, self.current_image, self.control_hand_position, scale=0.3
-                )
 
             # Draw info
             frame = self.draw_gesture_info(frame)
@@ -207,6 +216,12 @@ class AdvancedGestureStream(GestureStreamController):
             elif key == ord("m"):
                 show_metrics = not show_metrics
                 print(f"Metrics: {'ON' if show_metrics else 'OFF'}")
+            elif key == ord("h"):
+                self.show_annotations = not self.show_annotations
+                print(f"Annotations: {'ON' if self.show_annotations else 'OFF'}")
+            elif key == ord("i"):
+                self.show_gesture_info = not self.show_gesture_info
+                print(f"Gesture info: {'ON' if self.show_gesture_info else 'OFF'}")
 
         cap.release()
         if writer:

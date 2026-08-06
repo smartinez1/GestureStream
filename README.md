@@ -76,8 +76,9 @@ GestureStream/
 ├── gesture_stream_advanced.py     # Enhanced version with effects
 ├── gesture_stream_demo.py         # Demo with synthetic data
 ├── README.md                      # This file
-├── QUICK_REFERENCE.md            # Quick commands & tips
-├── SETUP_GUIDE.md                # Detailed configuration
+├── docs/                          # Detailed documentation
+│   ├── QUICK_REFERENCE.md         # Quick commands & tips
+│   └── SETUP_GUIDE.md             # Detailed configuration
 ├── requirements.txt               # Python dependencies
 └── .gitignore                     # Git ignore rules
 \`\`\`
@@ -172,9 +173,9 @@ controller.run()
 
 ## 📚 Documentation
 
-- **QUICK_REFERENCE.md** - Quick commands and tips
-- **SETUP_GUIDE.md** - Detailed configuration
-- **GESTURE_STREAM_README.md** - Technical details
+- **QUICK_REFERENCE.md** - Quick commands and tips (in `docs/`)
+- **SETUP_GUIDE.md** - Detailed configuration (in `docs/`)
+- **GESTURE_STREAM_README.md** - Technical details (in `docs/`)
 
 ## 🐛 Troubleshooting
 
