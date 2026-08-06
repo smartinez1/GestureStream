@@ -36,4 +36,4 @@ For logic verification without a camera, a synthetic harness works: stub `contro
 
 ## Docs
 
-README.md is the primary doc, but six overlapping markdown files exist. `REPO_SETUP_COMPLETE.md` is **stale** (references an old repo path and outdated line counts) — don't trust it. `SETUP_GUIDE.md` / `QUICK_REFERENCE.md` / `GESTURE_STREAM_README.md` / `GESTURE_QUICK_START.md` are redundant user docs; prefer the code as source of truth.
+README.md (repo root) is the primary doc, but five overlapping markdown files exist in `docs/`. `docs/REPO_SETUP_COMPLETE.md` is **stale** (references an old repo path and outdated line counts) — don't trust it. `docs/SETUP_GUIDE.md` / `docs/QUICK_REFERENCE.md` / `docs/GESTURE_STREAM_README.md` / `docs/GESTURE_QUICK_START.md` are redundant user docs; prefer the code as source of truth.
