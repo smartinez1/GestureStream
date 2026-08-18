@@ -151,7 +151,8 @@ export class PersonSegmenter {
     const mw = w >> 1;
     const mh = h >> 1;
     const result = this.segmenter.segmentForVideo(video, performance.now());
-    const conf = result.confidenceMasks[0];
+    const conf = result.confidenceMasks?.[0];
+    if (conf === undefined) return null;
     const sw = conf.width;
     const sh = conf.height;
     const data = conf.getAsFloat32Array();

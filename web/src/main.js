@@ -89,6 +89,15 @@ let fpsWindowStart = 0;
 let fps = 0;
 
 function renderFrame(ts) {
+  try {
+    renderBody(ts);
+  } catch (e) {
+    console.error("frame error", e);
+  }
+  requestAnimationFrame(renderFrame);
+}
+
+function renderBody(ts) {
   const dt = lastTs === null ? 1 / 30 : Math.min((ts - lastTs) / 1000, 0.1);
   lastTs = ts;
   const now = ts / 1000;
@@ -111,8 +120,8 @@ function renderFrame(ts) {
     ctx.drawImage(video, 0, 0, W, H);
     if (handLandmarker !== null) {
       const result = handLandmarker.detectForVideo(video, ts);
-      hands = result.handLandmarks;
-      handedness = result.handedness.map((h) => h[0].categoryName);
+      hands = result.handLandmarks ?? [];
+      handedness = (result.handedness ?? []).map((h) => h[0].categoryName);
     }
     if (personTracker !== null) personTracker.update(video, W, H);
   }
@@ -181,7 +190,6 @@ function renderFrame(ts) {
   if (showHud) drawHud(hands.length);
 
   updateStatusBar();
-  requestAnimationFrame(renderFrame);
 }
 
 function drawHud(numHands) {
