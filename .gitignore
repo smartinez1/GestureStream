@@ -48,3 +48,7 @@ gesture_recordings_*/
 temp_frames/
 *.mp4
 *.avi
+
+# Web app
+web/node_modules/
+web/dist/

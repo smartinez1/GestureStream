@@ -71,7 +71,18 @@ Runs the fire, tree, kaleidoscope and color-trail effects simultaneously:
 - 🙌 Hands spread apart, then together with palms up → a tree grows between the palms
 - 🙏 Hold a prayer pose (0.6s) → toggle kaleidoscope
 - 👋 Wave with both hands (3 swings) → toggle color trail (blues and purples)
-- \`h\` → Toggle HUD, \`q\` → Quit
+- `h` → Toggle HUD, `q` → Quit
+
+### Web App (Browser, Vercel-Deployable)
+
+```bash
+cd web
+npm install
+npm run dev        # camera demo at http://localhost:5173
+npm run build      # outputs web/dist (what Vercel serves)
+```
+
+Append `?demo=1` to the URL for the synthetic no-camera demo (4-phase 36 s cycle: fire → tree → kaleido → trail). The web app runs fully in-browser via the MediaPipe Tasks API (`.wasm`) — no Python, no backend. It lives on the `web-app` branch; the root `vercel.json` builds `web/` and serves `web/dist`. Same gestures and effects as the showcase, ported 1:1 to Canvas2D (`web/src/gestures/*.js` mirror the Python state classes).
 
 ### Standalone Effect Scripts
 
@@ -98,6 +109,14 @@ All dependencies listed in \`requirements.txt\`
 \`\`\`
 GestureStream/
 ├── gesture_stream_showcase.py          # All four effects combined
+├── web/                                # Web app (Canvas2D port, branch web-app)
+│   ├── index.html                      # Canvas + status bar
+│   └── src/                            # Vite + MediaPipe Tasks API
+│       ├── main.js                     # Render loop, demo state machine
+│       ├── mediapipe.js                # Model init wrapper
+│       ├── gestures/                   # Gesture state classes (1:1 with Python)
+│       └── effects/                    # Fire, tree, kaleidoscope, color trail
+├── vercel.json                         # Deploys web/ on Vercel
 ├── core/
 │   ├── gesture_stream.py               # Core implementation
 │   ├── gesture_stream_advanced.py      # Enhanced version with effects
