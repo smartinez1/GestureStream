@@ -73,7 +73,9 @@ Runs the fire, tree, kaleidoscope and color-trail effects simultaneously:
 - 👋 Wave with both hands (3 swings) → toggle color trail (blues and purples)
 - `h` → Toggle HUD, `q` → Quit
 
-### Web App (Browser, Vercel-Deployable)
+### Web App (Browser, Deployed)
+
+**Live:** https://gesture-stream-web.vercel.app — camera required; **synthetic demo (no camera):** https://gesture-stream-web.vercel.app/?demo=1
 
 ```bash
 cd web
