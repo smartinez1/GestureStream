@@ -120,7 +120,7 @@ function renderBody(ts) {
     ctx.drawImage(video, 0, 0, W, H);
     if (handLandmarker !== null) {
       const result = handLandmarker.detectForVideo(video, ts);
-      hands = result.handLandmarks ?? [];
+      hands = result.landmarks ?? [];
       handedness = (result.handedness ?? []).map((h) => h[0].categoryName);
     }
     if (personTracker !== null) personTracker.update(video, W, H);

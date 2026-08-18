@@ -49,7 +49,21 @@
     </style>
   </head>
   <body>
-    <video id="cam" style="display: none" autoplay playsinline></video>
+    <video
+      id="cam"
+      autoplay
+      playsinline
+      muted
+      style="
+        position: fixed;
+        width: 2px;
+        height: 2px;
+        top: 0;
+        left: 0;
+        opacity: 0.01;
+        pointer-events: none;
+      "
+    ></video>
     <canvas id="out"></canvas>
     <div id="status">
       <span id="fps">FPS: --</span>
