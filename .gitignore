@@ -52,3 +52,4 @@ temp_frames/
 # Web app
 web/node_modules/
 web/dist/
+package-lock.json
