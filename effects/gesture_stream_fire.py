@@ -1,13 +1,16 @@
 """
 Gesture Stream Fire - standalone gesture-controlled fire effect.
 
-Trigger: an open hand pointing up ("open hand pointing up flat") starts a
-flame at the palm center of that hand. The flame is continuously modulated
-by the OTHER hand's openness: open hand = roaring fire, closed = embers.
+Trigger: an L sign (index + thumb extended, the other fingers curled)
+lights a flame at that hand's palm. The flame is continuously modulated by
+the OTHER hand's vertical position: hand held high = roaring fire, low =
+embers, no second hand = the fire fades out.
 
 Self-contained: does not import any other gesture_stream module. Uses the
 MediaPipe Task API directly (VIDEO mode, 2 hands) and renders a numpy
-particle system with a blurred, additively-blended glow buffer.
+particle system with a blurred, additively-blended glow buffer. The pure
+gesture logic lives in FireGestureState (no MediaPipe, no camera) so other
+scripts can share it.
 
 Usage:
     python3 gesture_stream_fire.py            # camera
@@ -186,17 +189,113 @@ class FireEffect:
         return cv2.add(frame, halo)
 
 
-class FireGestureController:
-    """Standalone camera controller: open-hand-pointing-up triggers the
-    fire, other hand's openness continuously modulates its intensity."""
+class FireGestureState:
+    """Pure gesture logic for the fire effect (no MediaPipe, no camera).
 
-    OPENNESS_MIN = 0.10        # openness (tip/PIP ratio) -> heat 0.0
-    OPENNESS_MAX = 0.55        # openness -> heat 1.0
+    The first L-sign hand anchors the flame; the modulator hand's vertical
+    position is the heat: palm near the top of the frame (y ~ 0) is heat
+    1.0, near the bottom (y ~ 1) is heat 0.0, and with no second hand the
+    heat decays to 0.0 so the fire fades out. Updates trigger_center and
+    heat, and returns (trigger_center | None, heat, burning).
+
+    The flame level is smoothed: ``flame`` eases toward 1.0 while an L
+    sign is held and 0.0 after it is gone (``BURN_SMOOTHING``), and brief
+    L-sign dropouts shorter than ``L_GRACE_FRAMES`` keep the flame and its
+    anchor alive instead of popping it off."""
+
     HEAT_SMOOTHING = 0.12      # per-frame ease toward the target heat
-    VERTICALITY_THRESHOLD = 1.2
-    # wrist->middle-tip vector normalized by palm size; negative y points
-    # up (screen y grows downward). 1.2 = fingers clearly above the wrist.
-    FINGER_EXTEND_OFFSET = 0.03
+    BURN_SMOOTHING = 0.12      # per-frame ease of the flame level (0..1)
+    L_GRACE_FRAMES = 6         # L dropouts <= this many frames don't kill the flame
+    L_INDEX_OFFSET = 0.05      # index tip clearly above its PIP (core pointing offset)
+    L_CURL_OFFSET = 0.02       # curled tips must NOT be above their PIPs
+    L_THUMB_MIN_RATIO = 1.15   # thumb-tip reach from the wrist vs thumb IP
+
+    def __init__(self):
+        self.trigger_center = None
+        self.heat = 0.05
+        self.flame = 0.0           # smoothed burn level in [0,1]
+        self.burning = False
+        self._miss_frames = 0
+        self._held_target = 0.0    # last target heat while the L was held
+
+    def _palm_center(self, landmarks):
+        pts = [landmarks[i] for i in (0, 5, 17)]
+        return np.array([np.mean([p.x for p in pts]), np.mean([p.y for p in pts])])
+
+    def _is_l_sign(self, landmarks):
+        """L sign (fingers up): index + thumb extended, other fingers
+        curled. Mirrors the core's pointing offsets for the fingers; the
+        thumb check is scale-invariant (its tip must reach clearly farther
+        from the wrist than the thumb IP joint)."""
+        index_extended = landmarks[8].y < landmarks[6].y - self.L_INDEX_OFFSET
+        middle_curled = landmarks[12].y > landmarks[10].y - self.L_CURL_OFFSET
+        ring_curled = landmarks[16].y > landmarks[14].y - self.L_CURL_OFFSET
+        pinky_curled = landmarks[20].y > landmarks[18].y - self.L_CURL_OFFSET
+        if not (index_extended and middle_curled and ring_curled and pinky_curled):
+            return False
+        thumb_tip = np.linalg.norm(
+            [landmarks[4].x - landmarks[0].x, landmarks[4].y - landmarks[0].y]
+        )
+        thumb_ip = np.linalg.norm(
+            [landmarks[3].x - landmarks[0].x, landmarks[3].y - landmarks[0].y]
+        )
+        return thumb_tip > self.L_THUMB_MIN_RATIO * max(thumb_ip, 1e-6)
+
+    def update(self, hands, frame_size):
+        """Classify hands and return (trigger_center | None, heat, burning).
+
+        The first L-sign hand is the flame anchor; the other hand's Y
+        position is the heat: palm near the top of the frame (y ~ 0) is
+        heat 1.0, near the bottom (y ~ 1) is heat 0.0. Without a second
+        hand the heat decays to 0.0 (fire fades out).
+
+        ``burning`` is derived from the smoothed ``flame`` level, and the
+        anchor is kept alive through brief L-sign dropouts (grace window),
+        so tracking jitter can't pop the fire on and off."""
+        h, w = frame_size
+        trigger = None
+        modulator = None
+        for landmarks in hands:
+            if trigger is None and self._is_l_sign(landmarks):
+                trigger = landmarks
+            elif modulator is None:
+                modulator = landmarks
+        if trigger is not None:
+            self._miss_frames = 0
+            pc = self._palm_center(trigger)
+            self.trigger_center = (int(pc[0] * w), int(pc[1] * h))
+            if modulator is not None:
+                mod_pc = self._palm_center(modulator)
+                # palm at top (y≈0) -> heat 1.0; at bottom (y≈1) -> heat 0.0
+                target = float(np.clip(1.0 - mod_pc[1], 0.0, 1.0))
+            else:
+                target = 0.0          # no second hand -> fire fades out
+            self._held_target = target
+        else:
+            self._miss_frames += 1
+            if self._miss_frames <= self.L_GRACE_FRAMES:
+                # grace window: keep the anchor + heat from the last L frame
+                target = self._held_target
+            else:
+                target = 0.0
+        self.heat += (target - self.heat) * self.HEAT_SMOOTHING
+
+        flame_target = 1.0 if (
+            trigger is not None
+            or (self._miss_frames <= self.L_GRACE_FRAMES and self.burning)
+        ) else 0.0
+        self.flame += (flame_target - self.flame) * self.BURN_SMOOTHING
+        self.burning = self.flame > 0.02
+        if not self.burning and trigger is None:
+            self.trigger_center = None
+        return self.trigger_center, self.heat, self.burning
+
+
+class FireGestureController:
+    """Standalone camera controller: an L sign triggers the fire at that
+    palm, the other hand's vertical position continuously modulates its
+    intensity (high hand = roaring fire, low hand = embers, no second
+    hand = fade out)."""
 
     def __init__(self):
         self.BaseOptions = mp.tasks.BaseOptions
@@ -216,8 +315,7 @@ class FireGestureController:
         self.hand_landmarker = self.HandLandmarker.create_from_options(options)
 
         self.fire = FireEffect()
-        self.trigger_center = None
-        self.heat = 0.05
+        self.fire_gesture = FireGestureState()
         self.show_annotations = True
         self.frame_hands = []
 
@@ -243,84 +341,18 @@ class FireGestureController:
             print(f"Error downloading model: {e}")
             raise
 
-    def _hand_openness(self, landmarks):
-        """Mean tip-to-PIP distance relative to palm size (scale invariant)."""
-        wrist = landmarks[0]
-        middle_mcp = landmarks[9]
-        palm = max(
-            np.linalg.norm([wrist.x - middle_mcp.x, wrist.y - middle_mcp.y]),
-            1e-6,
-        )
-        distances = []
-        for tip_idx, pip_idx in ((4, 3), (8, 6), (12, 10), (16, 14), (20, 18)):
-            tip = landmarks[tip_idx]
-            pip = landmarks[pip_idx]
-            distances.append(np.linalg.norm([tip.x - pip.x, tip.y - pip.y]))
-        return float(np.mean(distances) / palm)
-
-    def _normalize_openness(self, openness):
-        return float(
-            np.clip(
-                (openness - self.OPENNESS_MIN)
-                / (self.OPENNESS_MAX - self.OPENNESS_MIN),
-                0.0,
-                1.0,
-            )
-        )
-
-    def _is_open(self, landmarks):
-        """>= 4 of 5 fingers extended (same logic as the core scripts)."""
-        extended = 0
-        for tip_idx, pip_idx in ((4, 3), (8, 6), (12, 10), (16, 14), (20, 18)):
-            if landmarks[tip_idx].y < landmarks[pip_idx].y - self.FINGER_EXTEND_OFFSET:
-                extended += 1
-        return extended >= 4
-
-    def _points_up(self, landmarks):
-        """Open hand held flat, fingers pointing up (screen y grows down)."""
-        wrist = landmarks[0]
-        middle_mcp = landmarks[9]
-        middle_tip = landmarks[12]
-        palm = max(
-            np.linalg.norm([middle_mcp.x - wrist.x, middle_mcp.y - wrist.y]),
-            1e-6,
-        )
-        d_y = (middle_tip.y - wrist.y) / palm
-        return d_y < -self.VERTICALITY_THRESHOLD
-
     def process_frame(self, frame, frame_timestamp_ms):
-        """Classify hands: the first open-pointing-up hand is the flame
-        anchor; the other hand's openness modulates intensity."""
+        """Detect hands once and delegate the gesture logic to
+        FireGestureState; ignite/extinguish the fire from its result."""
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
         result = self.hand_landmarker.detect_for_video(mp_image, frame_timestamp_ms)
+        self.frame_hands = [list(landmarks) for landmarks in result.hand_landmarks]
 
-        h, w = frame.shape[:2]
-        self.frame_hands = []
-        self.trigger_center = None
-        trigger = None
-        modulator = None
-
-        if result.hand_landmarks:
-            hands = [list(landmarks) for landmarks in result.hand_landmarks]
-            self.frame_hands = hands
-            for landmarks in hands:
-                if trigger is None and self._is_open(landmarks) and self._points_up(landmarks):
-                    trigger = landmarks
-                elif modulator is None:
-                    modulator = landmarks
-            if trigger is not None:
-                palm = np.mean([[lm.x for lm in trigger], [lm.y for lm in trigger]], axis=1)
-                self.trigger_center = (int(palm[0] * w), int(palm[1] * h))
-                source = modulator if modulator is not None else trigger
-                target = self._normalize_openness(self._hand_openness(source))
-            else:
-                target = self.heat
-        else:
-            target = self.heat
-
-        self.heat += (target - self.heat) * self.HEAT_SMOOTHING
-        if trigger is not None:
+        _, _, burning = self.fire_gesture.update(
+            self.frame_hands, frame.shape[:2]
+        )
+        if burning:
             self.fire.ignite()
         else:
             self.fire.extinguish()
@@ -331,8 +363,8 @@ class FireGestureController:
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
         print("Gesture Stream Fire Active!")
-        print("- Hold an open hand pointing up: fire burns at the palm")
-        print("- Openness of your OTHER hand controls the intensity")
+        print("- Make an L sign (index + thumb out): fire burns at that palm")
+        print("- Raise/lower your OTHER hand to control the intensity")
         print("- 'h' to toggle hand annotations")
         print("- 'q' to quit")
 
@@ -352,9 +384,13 @@ class FireGestureController:
             dt = min(now - last_fire_time, 0.1)
             last_fire_time = now
 
-            if self.trigger_center is not None:
+            if self.fire_gesture.trigger_center is not None:
+                intensity = self.fire_gesture.heat * self.fire_gesture.flame
                 frame = self.fire.draw(
-                    frame, self.trigger_center, heat=self.heat, dt=dt
+                    frame,
+                    self.fire_gesture.trigger_center,
+                    heat=intensity,
+                    dt=dt,
                 )
 
             if self.show_annotations:
@@ -369,9 +405,10 @@ class FireGestureController:
                         )
 
             state = "BURNING" if self.fire.is_burning() else "FADING"
+            intensity = self.fire_gesture.heat * self.fire_gesture.flame
             cv2.putText(
                 frame,
-                f"Fire: {state} | Heat: {self.heat * 100:.0f}%",
+                f"Fire: {state} | Intensity: {intensity * 100:.0f}%",
                 (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.8,

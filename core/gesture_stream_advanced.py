@@ -3,11 +3,15 @@ Advanced Gesture Stream with Recording and Effects
 Includes gesture recording, visualization, and custom image support
 """
 
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(__file__))
+
 import cv2
 import numpy as np
 from gesture_stream import GestureStreamController
 from datetime import datetime
-import os
 import time as time_module
 
 

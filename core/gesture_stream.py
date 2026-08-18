@@ -1,8 +1,12 @@
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(__file__))
+
 import cv2
 import numpy as np
 import mediapipe as mp
 from PIL import Image
-import os
 import glob
 from collections import deque
 import time

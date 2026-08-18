@@ -32,7 +32,7 @@ pip install -r requirements.txt
 ### Run Demo (No Camera Required)
 
 \`\`\`bash
-python3 gesture_stream_demo.py
+python3 core/gesture_stream_demo.py
 \`\`\`
 
 See animated demonstration of all features.
@@ -40,7 +40,7 @@ See animated demonstration of all features.
 ### Run Live with Camera
 
 \`\`\`bash
-python3 gesture_stream.py
+python3 core/gesture_stream.py
 \`\`\`
 
 **Controls:**
@@ -51,12 +51,37 @@ python3 gesture_stream.py
 ### Run Advanced Version
 
 \`\`\`bash
-python3 gesture_stream_advanced.py
+python3 core/gesture_stream_advanced.py
 \`\`\`
 
 **Additional Controls:**
 - \`r\` → Start/stop video recording
 - \`m\` → Toggle metrics display
+
+### Run All Effects Together (Showcase)
+
+\`\`\`bash
+python3 gesture_stream_showcase.py          # camera
+python3 gesture_stream_showcase.py --demo   # synthetic demo, no camera
+\`\`\`
+
+Runs the fire, tree, kaleidoscope and color-trail effects simultaneously:
+
+- 🤟 L sign (index + thumb out) → fire burns at that palm (raise/lower your other hand to control the heat: top of the frame = biggest fire; the flame fades in/out smoothly and survives brief tracking flicker)
+- 🙌 Hands spread apart, then together with palms up → a tree grows between the palms
+- 🙏 Hold a prayer pose (0.6s) → toggle kaleidoscope
+- 👋 Wave with both hands (3 swings) → toggle color trail (blues and purples)
+- \`h\` → Toggle HUD, \`q\` → Quit
+
+### Standalone Effect Scripts
+
+\`\`\`bash
+python3 effects/gesture_stream_fire.py --demo      # fire
+python3 effects/gesture_stream_tree.py --demo      # procedural tree
+python3 effects/gesture_stream_effects.py --demo   # kaleidoscope + color trail
+\`\`\`
+
+Each also runs live with the camera (drop \`--demo\`).
 
 ## 📋 Requirements
 
@@ -72,15 +97,25 @@ All dependencies listed in \`requirements.txt\`
 
 \`\`\`
 GestureStream/
-├── gesture_stream.py              # Core implementation
-├── gesture_stream_advanced.py     # Enhanced version with effects
-├── gesture_stream_demo.py         # Demo with synthetic data
-├── README.md                      # This file
-├── docs/                          # Detailed documentation
-│   ├── QUICK_REFERENCE.md         # Quick commands & tips
-│   └── SETUP_GUIDE.md             # Detailed configuration
-├── requirements.txt               # Python dependencies
-└── .gitignore                     # Git ignore rules
+├── gesture_stream_showcase.py          # All four effects combined
+├── core/
+│   ├── gesture_stream.py               # Core implementation
+│   ├── gesture_stream_advanced.py      # Enhanced version with effects
+│   ├── gesture_stream_demo.py          # Demo with synthetic data
+│   ├── gesture_stream_diffusion.py     # Voxel diffusion module
+│   └── __init__.py
+├── effects/
+│   ├── gesture_stream_fire.py          # Fire effect
+│   ├── gesture_stream_tree.py          # Procedural tree effect
+│   ├── gesture_stream_effects.py       # Kaleidoscope + color trail
+│   └── __init__.py
+├── images/                             # Images projected on the cube
+├── README.md                           # This file
+├── docs/                               # Detailed documentation
+│   ├── QUICK_REFERENCE.md              # Quick commands & tips
+│   └── SETUP_GUIDE.md                  # Detailed configuration
+├── requirements.txt                    # Python dependencies
+└── .gitignore                          # Git ignore rules
 \`\`\`
 
 ## 👆 Gesture Recognition
@@ -165,7 +200,7 @@ index_extended = index_tip.y < index_pip.y - 0.03  # Default: 0.05
 ## 🎓 Quick API
 
 \`\`\`python
-from gesture_stream import GestureStreamController
+from core.gesture_stream import GestureStreamController
 
 controller = GestureStreamController()
 controller.run()

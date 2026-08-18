@@ -3,6 +3,11 @@ Gesture Stream Demo - Simulated version for testing without camera
 Shows how the system works with synthetic hand data
 """
 
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(__file__))
+
 import cv2
 import numpy as np
 import time
