@@ -517,9 +517,9 @@ class WaveGestureState:
         self.wave_last_t = None
         self.wave_drop_t = None
         self.wave_track = {
-            "x": {"peak": None, "trough": None, "dir": None},
-            "y": {"peak": None, "trough": None, "dir": None},
-            "d": {"peak": None, "trough": None, "dir": None},
+            "x": {"peak": None, "trough": None, "dir": None, "prev": None},
+            "y": {"peak": None, "trough": None, "dir": None, "prev": None},
+            "d": {"peak": None, "trough": None, "dir": None, "prev": None},
         }
 
     def _palm_center(self, landmarks):

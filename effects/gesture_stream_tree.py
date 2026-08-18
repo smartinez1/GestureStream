@@ -587,7 +587,6 @@ class TreeGestureState:
                 # the final (together) pose finished -> tree disappears
                 if tree.is_active() and not tree.fading:
                     tree.start_fade()
-                    print("Tree fading")
                 self.state = "spread"
                 self.spread_peak = d
             elif d < self.TOGETHER_DIST:

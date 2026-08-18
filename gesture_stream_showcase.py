@@ -120,7 +120,7 @@ class ShowcaseController:
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
         result = self.hand_landmarker.detect_for_video(mp_image, frame_timestamp_ms)
         self.frame_hands = [list(lm) for lm in result.hand_landmarks]
-        handedness = [h[0].category_name for h in result.handedness]
+        handedness = [hr[0].category_name for hr in result.handedness]
 
         now = frame_timestamp_ms / 1000.0
         render_t = time.time()
@@ -259,6 +259,7 @@ class ShowcaseController:
         last_draw = time.time()
         frame_count = 0
         fps = 0.0
+        fps_window_start = time.time()
 
         while True:
             ret, frame = cap.read()
@@ -277,7 +278,10 @@ class ShowcaseController:
             last_draw = now
             frame_count += 1
             if frame_count % 30 == 0:
-                fps = 30.0 / dt if dt > 0 else 0.0
+                # average wall-time over the last 30 frames
+                elapsed = now - fps_window_start
+                fps = 30.0 / elapsed if elapsed > 0 else 0.0
+                fps_window_start = now
 
             if self.show_hud:
                 frame = self._draw_hud(frame, fps)
