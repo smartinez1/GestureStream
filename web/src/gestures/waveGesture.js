@@ -13,9 +13,9 @@ export class WaveGestureState {
     this.waveEnabled = false;
     this.waving = false;
     this.waveSamples = new CircularBuffer(90);
-    this.waveSwings = 0;
-    this.waveStartT = null;
-    this.waveLastT = null;
+    this.axisSwings = { x: 0, y: 0, d: 0 };
+    this.waveStartT = { x: null, y: null, d: null };
+    this.waveLastT = { x: null, y: null, d: null };
     this.waveDropT = null;
     this.waveTrack = {
       x: { peak: null, trough: null, dir: null, prev: null },
@@ -26,9 +26,9 @@ export class WaveGestureState {
 
   _waveReset() {
     this.waveSamples.clear();
-    this.waveSwings = 0;
-    this.waveStartT = null;
-    this.waveLastT = null;
+    this.axisSwings = { x: 0, y: 0, d: 0 };
+    this.waveStartT = { x: null, y: null, d: null };
+    this.waveLastT = { x: null, y: null, d: null };
     this.waveDropT = null;
     for (const s of Object.values(this.waveTrack)) {
       s.peak = s.trough = s.prev = null;
@@ -51,9 +51,9 @@ export class WaveGestureState {
     const nd = delta > 0 ? "up" : "down";
     if (s.dir !== null && nd !== s.dir) {
       if (s.peak - s.trough >= WaveGestureState.WAVE_AMPLITUDE) {
-        this.waveSwings += 1;
-        if (this.waveSwings === 1) this.waveStartT = now;
-        this.waveLastT = now;
+        this.axisSwings[key] += 1;
+        if (this.axisSwings[key] === 1) this.waveStartT[key] = now;
+        this.waveLastT[key] = now;
         s.peak = s.trough = v;
       }
     }
@@ -91,19 +91,26 @@ export class WaveGestureState {
     this._trackAxis("x", avg[0], now);
     this._trackAxis("y", avg[1], now);
     this._trackAxis("d", sep, now);
-    this.waving = moving || this.waveSwings > 0;
+    this.waving =
+      moving || this.axisSwings.x > 0 || this.axisSwings.y > 0 || this.axisSwings.d > 0;
 
-    if (this.waveSwings > 0 && now - this.waveLastT > WaveGestureState.WAVE_TIMEOUT) {
-      this._waveReset();
-      return false;
-    }
-    if (
-      this.waveSwings >= WaveGestureState.WAVE_SWINGS &&
-      now - this.waveStartT <= WaveGestureState.WAVE_WINDOW
-    ) {
-      this.waveEnabled = !this.waveEnabled;
-      this._waveReset();
-      return true;
+    for (const key of ["x", "y", "d"]) {
+      if (
+        this.axisSwings[key] > 0 &&
+        now - this.waveLastT[key] > WaveGestureState.WAVE_TIMEOUT
+      ) {
+        this.axisSwings[key] = 0;
+        this.waveStartT[key] = null;
+        this.waveLastT[key] = null;
+      }
+      if (
+        this.axisSwings[key] >= WaveGestureState.WAVE_SWINGS &&
+        now - this.waveStartT[key] <= WaveGestureState.WAVE_WINDOW
+      ) {
+        this.waveEnabled = !this.waveEnabled;
+        this._waveReset();
+        return true;
+      }
     }
     return false;
   }
@@ -147,10 +154,10 @@ export class PersonSegmenter {
     this._tmpCv = document.createElement("canvas");
   }
 
-  bbox(video, w, h) {
+  bbox(video, w, h, ts) {
     const mw = w >> 1;
     const mh = h >> 1;
-    const result = this.segmenter.segmentForVideo(video, performance.now());
+    const result = this.segmenter.segmentForVideo(video, ts);
     const conf = result.confidenceMasks?.[0];
     if (conf === undefined) return null;
     const sw = conf.width;
@@ -219,10 +226,10 @@ export class PersonTrackerState {
     this.center = null;
   }
 
-  update(video, w, h) {
+  update(video, w, h, ts) {
     this.frameCount += 1;
     if (this.frameCount % PersonTrackerState.SEGMENT_EVERY !== 0) return;
-    const box = this.segmenter.bbox(video, w, h);
+    const box = this.segmenter.bbox(video, w, h, ts);
     if (box === null) {
       this.missed += 1;
       if (this.missed > PersonTrackerState.MAX_MISSED) {

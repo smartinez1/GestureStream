@@ -123,7 +123,7 @@ function renderBody(ts) {
       hands = result.landmarks ?? [];
       handedness = (result.handedness ?? []).map((h) => h[0].categoryName);
     }
-    if (personTracker !== null) personTracker.update(video, W, H);
+    if (personTracker !== null) personTracker.update(video, W, H, ts);
   }
 
   let maskCv = null;

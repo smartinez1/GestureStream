@@ -13,6 +13,8 @@ export class Kaleidoscope {
     this.phase = 0;
     this.blend = 0;
     this._tileCv = document.createElement("canvas");
+    this._layerCv = document.createElement("canvas");
+    this._maskCv = document.createElement("canvas");
   }
 
   apply(ctx, video, W, H, dt = 1 / 30, box = null, center = null, active = null) {
@@ -44,7 +46,7 @@ export class Kaleidoscope {
           const th = y1 - y0;
           keep = Math.max(tw, th) / 2;
           full = keep * Kaleidoscope.MASK_FULL;
-          tile = this._buildMirrorTile(ctx, video, x0, y0, tw, th);
+          tile = this._buildMirrorTile(video, x0, y0, tw, th);
         }
       }
     }
@@ -58,7 +60,7 @@ export class Kaleidoscope {
     this.phase += dt * Kaleidoscope.ROTATION_SPEED;
 
     // kaleido layer: rotated pattern
-    const layerCv = document.createElement("canvas");
+    const layerCv = this._layerCv;
     layerCv.width = W;
     layerCv.height = H;
     const lctx = layerCv.getContext("2d");
@@ -102,7 +104,7 @@ export class Kaleidoscope {
     }
 
     // radial alpha mask
-    const maskCv = document.createElement("canvas");
+    const maskCv = this._maskCv;
     maskCv.width = W;
     maskCv.height = H;
     const mctx = maskCv.getContext("2d");
@@ -132,23 +134,34 @@ export class Kaleidoscope {
     ctx.restore();
   }
 
-  _buildMirrorTile(ctx, video, x0, y0, tw, th) {
+  _buildMirrorTile(video, x0, y0, tw, th) {
     const cv = this._tileCv;
     cv.width = tw * 2;
     cv.height = th * 2;
-    const tctx = cv.getContext("2d");
-    const quad = (px, py, flipX, flipY) => {
-      tctx.save();
-      tctx.translate(px, py);
-      if (flipX) tctx.scale(-1, 1);
-      if (flipY) tctx.scale(1, -1);
-      tctx.drawImage(video, -x0, -y0, tw, th, 0, 0, tw, th);
-      tctx.restore();
-    };
-    quad(0, 0, false, false);
-    quad(tw, 0, true, false);
-    quad(0, th, false, true);
-    quad(tw, th, true, true);
+    const tc = cv.getContext("2d");
+    tc.clearRect(0, 0, tw * 2, th * 2);
+
+    // top-left: original crop
+    tc.drawImage(video, x0, y0, tw, th, 0, 0, tw, th);
+
+    // top-right: horizontally mirrored
+    tc.save();
+    tc.scale(-1, 1);
+    tc.drawImage(video, x0, y0, tw, th, -2 * tw, 0, tw, th);
+    tc.restore();
+
+    // bottom-left: vertically mirrored
+    tc.save();
+    tc.scale(1, -1);
+    tc.drawImage(video, x0, y0, tw, th, 0, -2 * th, tw, th);
+    tc.restore();
+
+    // bottom-right: both mirrored
+    tc.save();
+    tc.scale(-1, -1);
+    tc.drawImage(video, x0, y0, tw, th, -2 * tw, -2 * th, tw, th);
+    tc.restore();
+
     return cv;
   }
 }
