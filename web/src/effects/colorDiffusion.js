@@ -95,9 +95,12 @@ export class ColorDiffusion {
       for (let x = 0; x < hw; x++) {
         const idx = y * hw + x;
         const isPerson = mdata[idx * 4] >= 128;
-        const a = isPerson
-          ? innerRim[idx * 4 + 3] / 255 // inside body → inner rim
-          : outerRim[idx * 4 + 3] / 255; // outside body → outer rim
+        // blur of a step edge peaks at ~127 alpha; normalize so the
+        // silhouette edge reaches 1.0 like the Python distance transform
+        const a = Math.min(
+          1,
+          (isPerson ? innerRim[idx * 4 + 3] : outerRim[idx * 4 + 3]) / 127.5
+        );
         if (a < 0.005) continue;
         const wgt = a * a * INTENSITY;
         const ang = Math.atan2(y - cy, x - cx);
