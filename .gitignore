@@ -53,3 +53,4 @@ temp_frames/
 web/node_modules/
 web/dist/
 package-lock.json
+.vercel
